@@ -55,10 +55,10 @@ Files are shared rather than whole packages, because Node resolves a symlink to 
 
 | Filesystem | Method | If a shared file is edited |
 |---|---|---|
-| APFS (macOS), Btrfs and XFS (Linux) | Reflink (copy-on-write) | Only that project's copy changes |
-| NTFS (Windows), ext4 (Linux) | Hard link | Every project sharing it changes |
+| Btrfs and XFS (Linux) | Reflink (copy-on-write) | Only that project's copy changes |
+| NTFS (Windows), ext4 (Linux), APFS (macOS) | Hard link | Every project sharing it changes |
 
-The best method is detected per volume by trying it. Hard links are also used on Windows ReFS, because Node has no forced-clone call there.
+The method is detected per volume by trying a reflink first, and `init` prints the result. Reflinks on APFS have not been confirmed yet, so expect hard links on macOS for now. Hard links are also used on Windows ReFS, because Node has no forced-clone call there.
 
 ## Safety
 

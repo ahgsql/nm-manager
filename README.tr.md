@@ -55,10 +55,10 @@ Paket yerine dosya ortaklaştırılır, çünkü Node bir symlink'in gerçek adr
 
 | Dosya sistemi | Yöntem | Ortak bir dosya düzenlenirse |
 |---|---|---|
-| APFS (macOS), Btrfs ve XFS (Linux) | Reflink (yazarken kopyalama) | Sadece o projenin kopyası değişir |
-| NTFS (Windows), ext4 (Linux) | Hardlink | Onu paylaşan tüm projelerde değişir |
+| Btrfs ve XFS (Linux) | Reflink (yazarken kopyalama) | Sadece o projenin kopyası değişir |
+| NTFS (Windows), ext4 (Linux), APFS (macOS) | Hardlink | Onu paylaşan tüm projelerde değişir |
 
-En iyi yöntem her sürücüde denenerek belirlenir. Windows ReFS'te de hardlink kullanılır, çünkü Node'da orada zorunlu klonlama çağrısı yoktur.
+Yöntem her sürücüde önce reflink denenerek belirlenir, `init` sonucu yazdırır. APFS'te reflink henüz doğrulanmadı, bu yüzden macOS'ta şimdilik hardlink bekle. Windows ReFS'te de hardlink kullanılır, çünkü Node'da orada zorunlu klonlama çağrısı yoktur.
 
 ## Güvenlik
 
