@@ -1,0 +1,39 @@
+{
+  "name": "nm-manager",
+  "version": "0.1.0",
+  "description": "Reclaim disk space from duplicate node_modules across existing projects, without migrating them to another package manager.",
+  "type": "module",
+  "bin": {
+    "nm-manager": "bin/nm-manager.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.15"
+  },
+  "keywords": [
+    "node_modules",
+    "deduplicate",
+    "disk-space",
+    "hardlink",
+    "reflink",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "Ali Haydar GÜLEÇ",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahgsql/nm-manager.git"
+  },
+  "homepage": "https://github.com/ahgsql/nm-manager#readme",
+  "bugs": {
+    "url": "https://github.com/ahgsql/nm-manager/issues"
+  }
+}

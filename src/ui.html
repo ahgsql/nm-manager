@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nm-manager</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f6; --panel: #ffffff; --text: #1b211d; --muted: #5d6a62; --line: #dde2de;
+  --accent: #14734a; --accent-text: #ffffff; --accent-soft: #e2f2ea; --warn: #8a5a00; --warn-soft: #fbf0d9; --danger: #a4302a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111513; --panel: #191f1c; --text: #e8ece9; --muted: #9aa69f; --line: #2c3530;
+    --accent: #4fc78f; --accent-text: #08130d; --accent-soft: #1b3328; --warn: #e6b45c; --warn-soft: #362a12; --danger: #ef8079;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 112px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 20px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grow { flex: 1 1 260px; min-width: 0; }
+input[type=text] { width: 100%; padding: 8px 10px; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+button { padding: 8px 14px; font: inherit; font-weight: 550; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button.primary { color: var(--accent-text); background: var(--accent); border-color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; }
+.stat b { display: block; font-size: 26px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat.good b { color: var(--accent); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 8px; text-align: left; border-top: 1px solid var(--line); vertical-align: top; }
+thead th { border-top: 0; font-size: 13px; font-weight: 550; color: var(--muted); white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.save { color: var(--accent); font-weight: 600; }
+.path { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.flag { display: inline-block; margin: 4px 4px 0 0; padding: 0 7px; font-size: 12px; color: var(--warn); background: var(--warn-soft); border-radius: 4px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+progress { width: 100%; height: 8px; accent-color: var(--accent); margin-top: 8px; }
+.notice { padding: 12px 14px; border-radius: 6px; background: var(--accent-soft); margin-bottom: 16px; }
+.notice.error { background: var(--warn-soft); color: var(--danger); }
+.bar { position: fixed; inset: auto 0 0 0; background: var(--panel); border-top: 1px solid var(--line); padding: 12px 16px; }
+.bar > div { max-width: 1008px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.spacer { flex: 1; }
+dialog { max-width: 460px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+[hidden] { display: none !important; }
+label.store { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>nm-manager</h1>
+    <span class="muted small" id="tagline"></span>
+  </header>
+
+  <div id="notice" class="notice" role="status" hidden></div>
+
+  <section class="panel" id="setup" hidden>
+    <h2 id="setup-title"></h2>
+    <p class="muted small" id="setup-text"></p>
+    <div id="setup-list"></div>
+    <div class="row" style="margin-top:8px">
+      <div class="grow"><input type="text" id="setup-custom" aria-label="Custom location"></div>
+      <button class="primary" id="setup-save"></button>
+    </div>
+  </section>
+
+  <section class="panel" id="target" hidden>
+    <form class="row" id="scan-form">
+      <div class="grow"><input type="text" id="dir" autocomplete="off"></div>
+      <button type="button" id="browse"></button>
+      <button class="primary" id="scan"></button>
+    </form>
+    <div id="progress" hidden>
+      <progress id="progress-bar" max="1" value="0"></progress>
+      <div class="muted small" id="progress-text"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="summary" hidden>
+    <div class="stats">
+      <div class="stat"><b id="stat-projects"></b><span class="muted small" id="label-projects"></span></div>
+      <div class="stat"><b id="stat-size"></b><span class="muted small" id="label-size"></span></div>
+      <div class="stat good"><b id="stat-save"></b><span class="muted small" id="label-save"></span></div>
+    </div>
+  </section>
+
+  <section class="panel table-wrap" id="results" hidden>
+    <table>
+      <thead><tr>
+        <th><input type="checkbox" id="select-all"></th>
+        <th id="col-project"></th>
+        <th class="num" id="col-size"></th>
+        <th class="num" id="col-save"></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+
+  <section class="muted small" id="stores"></section>
+</main>
+
+<div class="bar" id="actions" hidden>
+  <div>
+    <span id="selection"></span>
+    <span class="spacer"></span>
+    <button id="gc"></button>
+    <button id="undo"></button>
+    <button class="primary" id="apply"></button>
+  </div>
+</div>
+
+<dialog id="confirm">
+  <h2 id="confirm-title"></h2>
+  <p class="muted" id="confirm-text"></p>
+  <div class="row" style="justify-content:flex-end">
+    <button id="confirm-no"></button>
+    <button class="primary" id="confirm-yes"></button>
+  </div>
+</dialog>
+
+<script>
+const STRINGS = {
+  en: {
+    tagline: 'Reclaim disk space from duplicate node_modules',
+    setupTitle: 'Choose where shared files are kept',
+    setupText: 'Links cannot cross drives, so each drive you want to clean needs its own location.',
+    customPlaceholder: 'Or type another folder',
+    create: 'Create',
+    dirPlaceholder: 'Folder to search, including its subfolders',
+    browse: 'Browse',
+    scan: 'Scan',
+    projects: 'projects found',
+    size: 'total size',
+    saveable: 'estimated savings',
+    project: 'Project',
+    colSize: 'Size',
+    colSave: 'Saveable',
+    selected: (n, s) => `${n} selected, saves about ${s}`,
+    gc: 'Clean store',
+    undo: 'Undo',
+    apply: 'Apply',
+    cancel: 'Cancel',
+    selectAll: 'Select all eligible projects',
+    selectOne: (name) => `Select ${name}`,
+    flagHelp: { pnpm: 'already linked by pnpm', patched: 'patched: files are edited in place', synced: 'in a cloud-sync folder', 'no-store': 'no store on this drive' },
+    phase: { list: 'Listing projects', hash: 'Comparing files', link: 'Sharing files', undo: 'Restoring copies' },
+    applyTitle: 'Share identical files?',
+    applyText: (n, s) => `${n} project(s) will share identical files. Estimated savings: ${s}. Projects keep working as they are, and you can undo this.`,
+    undoTitle: 'Restore independent copies?',
+    undoText: (n) => `${n} project(s) will get their own copies again, which uses disk space.`,
+    gcTitle: 'Clean the store?',
+    gcText: 'Deletes shared files that no project uses any more. Projects are not affected.',
+    continue: 'Continue',
+    applied: (r, s) => `Done. ${r.linked} files linked to the store, ${r.added} added, ${r.already} already shared. Free space changed by ${s}.`,
+    undone: (r) => `Done. ${r.restored} files are independent copies again.`,
+    cleaned: (r, s) => `Removed ${r.removed} unused files, ${s}.`,
+    skipped: (n) => ` ${n} files were in use and left untouched.`,
+    corrupted: (n) => ` ${n} store files had been edited in place and were quarantined; reinstall the affected projects.`,
+    none: 'No node_modules found in this folder.',
+    pickFailed: 'No folder dialog is available here. Type the path instead.',
+    storeLine: (s) => `Store ${s.path} (${s.mode}): ${s.objects} files, ${fmt(s.bytes)}, saving ${s.mode === 'hardlink' ? fmt(s.savedBytes) : 'space through clones'}`,
+  },
+  tr: {
+    tagline: 'Kopya node_modules klasörlerinden disk alanı kazan',
+    setupTitle: 'Ortak dosyaların duracağı yeri seç',
+    setupText: 'Linkler sürücüler arasında çalışmaz, bu yüzden temizlemek istediğin her sürücüye ayrı bir konum gerekir.',
+    customPlaceholder: 'Ya da başka bir klasör yaz',
+    create: 'Oluştur',
+    dirPlaceholder: 'Alt klasörleriyle aranacak klasör',
+    browse: 'Gözat',
+    scan: 'Tara',
+    projects: 'proje bulundu',
+    size: 'toplam boyut',
+    saveable: 'tahmini kazanç',
+    project: 'Proje',
+    colSize: 'Boyut',
+    colSave: 'Kazanç',
+    selected: (n, s) => `${n} seçili, yaklaşık ${s} kazandırır`,
+    gc: 'Depoyu temizle',
+    undo: 'Geri al',
+    apply: 'Uygula',
+    cancel: 'Vazgeç',
+    selectAll: 'Uygun tüm projeleri seç',
+    selectOne: (name) => `${name} projesini seç`,
+    flagHelp: { pnpm: 'pnpm zaten bağlamış', patched: 'yamalı: dosyalar yerinde düzenleniyor', synced: 'bulut eşitleme klasöründe', 'no-store': 'bu sürücüde depo yok' },
+    phase: { list: 'Projeler listeleniyor', hash: 'Dosyalar karşılaştırılıyor', link: 'Dosyalar ortaklaştırılıyor', undo: 'Kopyalar geri yükleniyor' },
+    applyTitle: 'Aynı dosyalar ortaklaştırılsın mı?',
+    applyText: (n, s) => `${n} proje aynı dosyaları paylaşacak. Tahmini kazanç: ${s}. Projeler aynen çalışmaya devam eder, işlemi geri alabilirsin.`,
+    undoTitle: 'Bağımsız kopyalar geri yüklensin mi?',
+    undoText: (n) => `${n} proje yeniden kendi kopyalarına sahip olacak, bu disk alanı kullanır.`,
+    gcTitle: 'Depo temizlensin mi?',
+    gcText: 'Artık hiçbir projenin kullanmadığı ortak dosyaları siler. Projeler etkilenmez.',
+    continue: 'Devam et',
+    applied: (r, s) => `Tamam. ${r.linked} dosya depoya bağlandı, ${r.added} dosya eklendi, ${r.already} dosya zaten ortaktı. Boş alan değişimi: ${s}.`,
+    undone: (r) => `Tamam. ${r.restored} dosya yeniden bağımsız kopya.`,
+    cleaned: (r, s) => `Kullanılmayan ${r.removed} dosya silindi, ${s}.`,
+    skipped: (n) => ` ${n} dosya kullanımda olduğu için olduğu gibi bırakıldı.`,
+    corrupted: (n) => ` ${n} depo dosyası yerinde düzenlenmiş ve karantinaya alındı; etkilenen projeleri yeniden kur.`,
+    none: 'Bu klasörde node_modules bulunamadı.',
+    pickFailed: 'Burada klasör penceresi açılamıyor. Yolu elle yaz.',
+    storeLine: (s) => `Depo ${s.path} (${s.mode}): ${s.objects} dosya, ${fmt(s.bytes)}, kazanç ${s.mode === 'hardlink' ? fmt(s.savedBytes) : 'klonlarla sağlanıyor'}`,
+  },
+};
+const lang = navigator.language.toLowerCase().startsWith('tr') ? 'tr' : 'en';
+const T = STRINGS[lang];
+document.documentElement.lang = lang;
+
+const token = new URLSearchParams(location.search).get('t');
+const $ = (id) => document.getElementById(id);
+
+function fmt(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = Math.abs(bytes);
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return `${bytes < 0 ? '-' : ''}${unit === 0 ? value : value.toFixed(value >= 100 ? 0 : 1)} ${units[unit]}`;
+}
+
+async function api(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: { 'x-nm-token': token, 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
+}
+
+function notify(text, isError = false) {
+  const box = $('notice');
+  box.textContent = text;
+  box.className = isError ? 'notice error' : 'notice';
+  box.hidden = !text;
+}
+
+function setBusy(busy) {
+  for (const id of ['scan', 'browse', 'apply', 'undo', 'gc']) $(id).disabled = busy;
+  $('progress').hidden = !busy;
+  if (!busy) refreshSelection();
+}
+
+async function waitForJob() {
+  setBusy(true);
+  try {
+    for (;;) {
+      const job = await api('GET', '/api/job');
+      $('progress-bar').max = job.total || 1;
+      $('progress-bar').value = job.done;
+      $('progress-text').textContent = job.phase ? `${T.phase[job.phase] ?? job.phase}: ${job.done} / ${job.total}` : '';
+      if (!job.running) {
+        if (job.error) throw new Error(job.error);
+        return job.result;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  } finally {
+    setBusy(false);
+  }
+}
+
+let scan = null;
+let lastDirs = [];
+let estimateToken = 0;
+
+const selectedPaths = () => [...document.querySelectorAll('.pick:checked')].map((box) => box.value);
+
+async function refreshSelection() {
+  if (!scan) return;
+  const paths = selectedPaths();
+  const eligible = [...document.querySelectorAll('.pick:not(:disabled)')];
+  $('select-all').checked = eligible.length > 0 && paths.length === eligible.length;
+  $('apply').disabled = paths.length === 0;
+  $('undo').disabled = paths.length === 0;
+  const ticket = ++estimateToken;
+  const estimate = await api('POST', '/api/estimate', { paths });
+  if (ticket !== estimateToken) return;
+  scan.selectionTotal = estimate.total;
+  $('selection').textContent = T.selected(paths.length, fmt(estimate.total));
+}
+
+function render() {
+  const { projects, total, perProject } = scan;
+  $('summary').hidden = projects.length === 0;
+  $('results').hidden = projects.length === 0;
+  $('actions').hidden = projects.length === 0;
+  $('stat-projects').textContent = projects.length;
+  $('stat-size').textContent = fmt(projects.reduce((sum, project) => sum + project.bytes, 0));
+  $('stat-save').textContent = `~${fmt(total)}`;
+  const rows = $('rows');
+  rows.textContent = '';
+  for (const project of projects) {
+    const row = rows.insertRow();
+    const pick = document.createElement('input');
+    pick.type = 'checkbox';
+    pick.className = 'pick';
+    pick.value = project.path;
+    pick.checked = project.eligible;
+    pick.disabled = !project.eligible;
+    pick.setAttribute('aria-label', T.selectOne(project.name ?? project.projectDir));
+    pick.addEventListener('change', refreshSelection);
+    row.insertCell().append(pick);
+    const cell = row.insertCell();
+    const title = document.createElement('div');
+    title.textContent = project.name ?? project.projectDir.split(/[\\/]/).pop();
+    const location = document.createElement('div');
+    location.className = 'path';
+    location.textContent = project.projectDir;
+    cell.append(title, location);
+    for (const flag of project.flags) {
+      const tag = document.createElement('span');
+      tag.className = 'flag';
+      tag.textContent = T.flagHelp[flag] ?? flag;
+      cell.append(tag);
+    }
+    const sizeCell = row.insertCell();
+    sizeCell.className = 'num';
+    sizeCell.textContent = fmt(project.bytes);
+    const saveCell = row.insertCell();
+    saveCell.className = project.eligible ? 'num save' : 'num muted';
+    saveCell.textContent = project.eligible ? fmt(perProject[project.path] ?? 0) : '-';
+  }
+  refreshSelection();
+}
+
+async function loadState() {
+  const state = await api('GET', '/api/state');
+  const ready = state.stores.length > 0;
+  $('setup').hidden = ready;
+  $('target').hidden = !ready;
+  if (!ready) {
+    const list = $('setup-list');
+    list.textContent = '';
+    state.suggestions.forEach((suggestion, index) => {
+      const label = document.createElement('label');
+      label.className = 'store';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'store-pick';
+      box.value = suggestion;
+      box.checked = index === 0;
+      const text = document.createElement('span');
+      text.textContent = suggestion;
+      label.append(box, text);
+      list.append(label);
+    });
+  }
+  const lines = $('stores');
+  lines.textContent = '';
+  for (const store of state.stores) {
+    const line = document.createElement('div');
+    line.textContent = T.storeLine(store);
+    lines.append(line);
+  }
+}
+
+async function runScan(dirs) {
+  lastDirs = dirs;
+  await api('POST', '/api/scan', { dirs });
+  scan = await waitForJob();
+  render();
+  await loadState();
+  return scan.projects.length;
+}
+
+function confirmAction(title, text, label) {
+  return new Promise((resolve) => {
+    const dialog = $('confirm');
+    $('confirm-title').textContent = title;
+    $('confirm-text').textContent = text;
+    $('confirm-yes').textContent = label;
+    const finish = (answer) => { dialog.close(); resolve(answer); };
+    $('confirm-yes').onclick = () => finish(true);
+    $('confirm-no').onclick = () => finish(false);
+    dialog.oncancel = () => resolve(false);
+    dialog.showModal();
+  });
+}
+
+const guarded = (task) => async (event) => {
+  event?.preventDefault();
+  try {
+    await task();
+  } catch (error) {
+    notify(error.message, true);
+  }
+};
+
+function applyMessage(result) {
+  const freed = Object.values(result.freed).reduce((sum, value) => sum + value, 0);
+  let text = T.applied(result, fmt(freed));
+  if (result.skippedCount) text += T.skipped(result.skippedCount);
+  if (result.corrupted.length) text += T.corrupted(result.corrupted.length);
+  return text;
+}
+
+$('scan-form').addEventListener('submit', guarded(async () => {
+  notify('');
+  const count = await runScan([$('dir').value.trim()]);
+  if (count === 0) notify(T.none);
+}));
+$('browse').addEventListener('click', guarded(async () => {
+  const { path } = await api('POST', '/api/pick-folder');
+  if (path) $('dir').value = path;
+  else if (!$('dir').value) notify(T.pickFailed);
+}));
+$('select-all').addEventListener('change', (event) => {
+  for (const box of document.querySelectorAll('.pick:not(:disabled)')) box.checked = event.target.checked;
+  refreshSelection();
+});
+$('apply').addEventListener('click', guarded(async () => {
+  const paths = selectedPaths();
+  await refreshSelection();
+  if (!await confirmAction(T.applyTitle, T.applyText(paths.length, fmt(scan.selectionTotal)), T.apply)) return;
+  await api('POST', '/api/apply', { paths });
+  const result = await waitForJob();
+  await runScan(lastDirs);
+  notify(applyMessage(result));
+}));
+$('undo').addEventListener('click', guarded(async () => {
+  const paths = selectedPaths();
+  if (!await confirmAction(T.undoTitle, T.undoText(paths.length), T.undo)) return;
+  await api('POST', '/api/undo', { paths });
+  const result = await waitForJob();
+  await runScan(lastDirs);
+  notify(T.undone(result) + (result.skippedCount ? T.skipped(result.skippedCount) : ''));
+}));
+$('gc').addEventListener('click', guarded(async () => {
+  if (!await confirmAction(T.gcTitle, T.gcText, T.continue)) return;
+  await api('POST', '/api/gc');
+  const result = await waitForJob();
+  await loadState();
+  notify(T.cleaned(result, fmt(result.bytes)));
+}));
+$('setup-save').addEventListener('click', guarded(async () => {
+  const stores = [...document.querySelectorAll('.store-pick:checked')].map((box) => box.value);
+  const custom = $('setup-custom').value.trim();
+  if (custom) stores.push(custom);
+  await api('POST', '/api/init', { stores });
+  notify('');
+  await loadState();
+}));
+
+$('tagline').textContent = T.tagline;
+$('setup-title').textContent = T.setupTitle;
+$('setup-text').textContent = T.setupText;
+$('setup-custom').placeholder = T.customPlaceholder;
+$('setup-save').textContent = T.create;
+$('dir').placeholder = T.dirPlaceholder;
+$('dir').setAttribute('aria-label', T.dirPlaceholder);
+$('browse').textContent = T.browse;
+$('scan').textContent = T.scan;
+$('label-projects').textContent = T.projects;
+$('label-size').textContent = T.size;
+$('label-save').textContent = T.saveable;
+$('col-project').textContent = T.project;
+$('col-size').textContent = T.colSize;
+$('col-save').textContent = T.colSave;
+$('gc').textContent = T.gc;
+$('undo').textContent = T.undo;
+$('apply').textContent = T.apply;
+$('confirm-no').textContent = T.cancel;
+$('select-all').setAttribute('aria-label', T.selectAll);
+
+guarded(loadState)();
+</script>
+</body>
+</html>
